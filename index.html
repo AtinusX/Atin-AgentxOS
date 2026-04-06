@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>AgentXOS — Self-Evolving Agent Ecosystem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0c0f;--bg2:#0f1215;--bg3:#141820;--bg4:#1a2030;
+  --border:#1e2840;--border2:#2a3550;
+  --green:#00ff88;--green2:#00cc6a;--greenDim:rgba(0,255,136,.12);
+  --blue:#4488ff;--blueDim:rgba(68,136,255,.12);
+  --amber:#ffaa00;--amberDim:rgba(255,170,0,.12);
+  --red:#ff4455;--redDim:rgba(255,68,85,.12);
+  --purple:#aa55ff;--purpleDim:rgba(170,85,255,.12);
+  --cyan:#00ddff;--cyanDim:rgba(0,221,255,.12);
+  --text:#c8d4e8;--text2:#7890b0;--text3:#4a5870;
+  --font:'Syne',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+html,body{background:var(--bg);color:var(--text);font-family:var(--font);height:100%;overflow:hidden}
+.app{display:grid;grid-template-columns:260px 1fr 340px;grid-template-rows:56px 1fr;height:100vh}
+
+/* TOPBAR */
+.topbar{grid-column:1/-1;display:flex;align-items:center;gap:14px;padding:0 18px;background:var(--bg2);border-bottom:1px solid var(--border);z-index:20}
+.logo{font-size:15px;font-weight:800;color:#fff;letter-spacing:-.5px;white-space:nowrap}
+.logo em{color:var(--green);font-style:normal}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s ease-in-out infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.topbar-mid{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
+.goal-input{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:border .2s;min-width:0}
+.goal-input:focus{border-color:var(--blue)}
+.goal-input::placeholder{color:var(--text3)}
+.goal-input:disabled{opacity:.5}
+.btn-run{background:var(--green);color:#000;font-family:var(--font);font-weight:700;font-size:12px;padding:8px 16px;border-radius:8px;border:none;cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0}
+.btn-run:hover:not(:disabled){background:var(--green2);transform:translateY(-1px)}
+.btn-run:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-clear{background:transparent;border:1px solid var(--border2);color:var(--text2);font-family:var(--font);font-size:12px;padding:8px 12px;border-radius:8px;cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0}
+.btn-clear:hover{border-color:var(--red);color:var(--red)}
+.btn-key{background:transparent;border:1px solid var(--amber);color:var(--amber);font-family:var(--mono);font-size:10px;padding:6px 10px;border-radius:6px;cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0}
+.btn-key:hover{background:var(--amberDim)}
+
+/* KEY MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:28px;width:480px;max-width:95vw}
+.modal h2{font-size:16px;font-weight:700;color:#fff;margin-bottom:6px}
+.modal p{font-size:12px;color:var(--text2);margin-bottom:20px;line-height:1.6}
+.modal-field{margin-bottom:14px}
+.modal-label{font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px;display:block;font-family:var(--mono)}
+.modal-select,.modal-input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;transition:border .2s}
+.modal-select:focus,.modal-input:focus{border-color:var(--blue)}
+.modal-select option{background:var(--bg3)}
+.modal-btns{display:flex;gap:8px;margin-top:20px}
+.btn-save{flex:1;background:var(--green);color:#000;font-family:var(--font);font-weight:700;font-size:13px;padding:10px;border-radius:8px;border:none;cursor:pointer}
+.btn-cancel{flex:1;background:transparent;border:1px solid var(--border2);color:var(--text2);font-family:var(--font);font-size:13px;padding:10px;border-radius:8px;cursor:pointer}
+.provider-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-family:var(--mono);font-weight:700;margin-left:8px}
+.provider-anthropic{background:rgba(0,255,136,.15);color:var(--green);border:1px solid var(--green)}
+.provider-openai{background:rgba(68,136,255,.15);color:var(--blue);border:1px solid var(--blue)}
+.provider-groq{background:rgba(170,85,255,.15);color:var(--purple);border:1px solid var(--purple)}
+.provider-openrouter{background:rgba(255,170,0,.15);color:var(--amber);border:1px solid var(--amber)}
+
+/* LEFT PANEL */
+.left{background:var(--bg2);border-right:1px solid var(--border);overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:10px}
+.panel-title{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--text3);text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.count-box{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;font-size:11px;color:var(--text2);display:flex;flex-direction:column;gap:2px}
+.count-box strong{font-size:22px;font-weight:800;color:var(--purple);line-height:1}
+.agent-list{display:flex;flex-direction:column;gap:7px}
+.agent-empty{font-size:11px;color:var(--text3);text-align:center;padding:20px 0}
+.agent-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px;cursor:pointer;transition:all .2s;animation:fadeIn .3s ease}
+.agent-card:hover{border-color:var(--border2);transform:translateX(2px)}
+.agent-card.selected{border-color:var(--green);background:var(--bg4)}
+.card-header{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px}
+.card-icon{font-size:18px;line-height:1;flex-shrink:0}
+.card-name{font-size:11px;font-weight:700;color:#fff;margin-bottom:2px}
+.card-role{font-size:10px;color:var(--text2);line-height:1.4}
+.card-footer{display:flex;align-items:center;gap:5px}
+.status-badge{font-size:9px;font-family:var(--mono);font-weight:600;padding:2px 7px;border-radius:4px;border:1px solid transparent}
+.s-idle{background:var(--bg4);color:var(--text2);border-color:var(--border2)}
+.s-thinking{background:var(--blueDim);color:var(--blue);border-color:var(--blue)}
+.s-active{background:var(--greenDim);color:var(--green);border-color:var(--green)}
+.s-error{background:var(--redDim);color:var(--red);border-color:var(--red)}
+.auto-tag{font-size:8px;font-family:var(--mono);font-weight:700;padding:2px 5px;border-radius:4px;background:var(--purpleDim);color:var(--purple);border:1px solid var(--purple)}
+
+/* CANVAS */
+.canvas{background:var(--bg);position:relative;overflow:hidden}
+.canvas-grid{position:absolute;inset:0;background-image:radial-gradient(circle,var(--border) 1px,transparent 1px);background-size:32px 32px;opacity:.35}
+.canvas-svg{position:absolute;inset:0;pointer-events:none;width:100%;height:100%}
+.nodes{position:absolute;inset:0}
+.empty-state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text3);text-align:center;pointer-events:none}
+.empty-icon{font-size:56px;opacity:.18;line-height:1}
+.empty-state h3{font-size:16px;font-weight:600;color:var(--text2)}
+.empty-state p{font-size:13px;line-height:1.8}
+
+/* NODES */
+.node{position:absolute;width:172px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:13px;cursor:pointer;transition:border-color .2s,box-shadow .2s;user-select:none;animation:nodeSpawn .5s cubic-bezier(.34,1.56,.64,1) both}
+.node:hover{border-color:var(--border2)}
+.node.selected{box-shadow:0 0 20px var(--node-glow,rgba(0,255,136,.2))}
+.node.running{animation:nodeSpawn .5s cubic-bezier(.34,1.56,.64,1) both,nodePulse 1.5s ease-in-out infinite}
+.auto-spawn-tag{position:absolute;top:-1px;right:8px;font-size:8px;font-family:var(--mono);font-weight:700;color:var(--purple);background:var(--purpleDim);border:1px solid var(--purple);border-top:none;padding:1px 5px;border-radius:0 0 5px 5px}
+.node-icon{font-size:20px;margin-bottom:6px;display:block}
+.node-name{font-size:12px;font-weight:700;color:#fff;margin-bottom:2px}
+.node-type{font-size:9px;font-family:var(--mono);font-weight:600;letter-spacing:.5px;margin-bottom:8px}
+.node-activity{font-size:10px;color:var(--text2);line-height:1.5;min-height:28px;margin-bottom:8px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.node-bar{height:2px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-bottom:8px}
+.node-bar-fill{height:100%;border-radius:2px;transition:width .5s ease}
+.node-footer{display:flex;align-items:center;justify-content:space-between}
+.artifact-count{font-size:9px;font-family:var(--mono);color:var(--green);background:var(--greenDim);padding:2px 6px;border-radius:4px;border:1px solid var(--green)}
+
+/* RIGHT PANEL */
+.right{background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.tab{flex:1;padding:13px 8px;font-size:11px;font-weight:600;color:var(--text3);cursor:pointer;text-align:center;border:none;border-bottom:2px solid transparent;background:transparent;transition:all .2s;font-family:var(--font)}
+.tab:hover{color:var(--text2)}
+.tab.active{color:var(--green);border-bottom-color:var(--green)}
+.tab-body{flex:1;overflow-y:auto;padding:10px}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* LOGS */
+.log-stream{display:flex;flex-direction:column;gap:3px}
+.log-entry{padding:7px 9px;border-radius:7px;font-family:var(--mono);font-size:10.5px;line-height:1.5;border:1px solid transparent;animation:fadeIn .2s ease}
+.log-time{color:var(--text3);margin-right:7px;font-size:9.5px}
+.l-system{background:var(--bg3);color:var(--text2);border-color:var(--border)}
+.l-agent{background:var(--blueDim);color:var(--blue);border-color:rgba(68,136,255,.3)}
+.l-spawn{background:var(--purpleDim);color:var(--purple);border-color:rgba(170,85,255,.3)}
+.l-code{background:var(--greenDim);color:var(--green);border-color:rgba(0,255,136,.3)}
+.l-error{background:var(--redDim);color:var(--red);border-color:rgba(255,68,85,.3)}
+.l-thinking{background:var(--amberDim);color:var(--amber);border-color:rgba(255,170,0,.3)}
+
+/* CODE */
+.code-list{display:flex;flex-direction:column;gap:12px}
+.code-block{background:var(--bg3);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.code-hdr{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--bg4)}
+.code-lbl{font-size:10.5px;font-weight:700;color:var(--text2);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:8px}
+.lang-tag{font-size:9px;padding:2px 6px;border-radius:4px;font-family:var(--mono);font-weight:600;flex-shrink:0}
+.lang-python{background:#3d6e40;color:#a8dda8}
+.lang-javascript,.lang-js{background:#5a4a1a;color:#f0d060}
+.lang-typescript,.lang-ts{background:#1a3060;color:#6090e0}
+.lang-sql{background:#2a1a50;color:#a070e0}
+.lang-yaml{background:#1a3830;color:#60c0a0}
+.lang-markdown,.lang-md{background:#3a2020;color:#c08080}
+.lang-dockerfile{background:#102030;color:#60a0d0}
+.lang-text{background:#2a2a2a;color:#aaa}
+.copy-btn{background:transparent;border:1px solid var(--border2);color:var(--text2);font-family:var(--mono);font-size:9px;padding:3px 7px;border-radius:5px;cursor:pointer;transition:all .2s;flex-shrink:0;margin-left:6px}
+.copy-btn:hover{border-color:var(--green);color:var(--green)}
+.code-body{padding:12px;font-family:var(--mono);font-size:10px;line-height:1.7;color:#a8d8c8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto}
+
+/* AGENT DETAIL */
+.detail{display:flex;flex-direction:column;gap:8px}
+.detail-empty{text-align:center;color:var(--text3);font-size:12px;padding:40px 16px;line-height:1.8}
+.detail-card{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+.detail-label{font-size:9px;font-weight:700;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;margin-bottom:5px}
+.detail-val{font-size:12px;color:var(--text);line-height:1.6}
+.detail-mono{font-family:var(--mono);font-size:11px;color:#a8d8c8}
+.cap-tag{display:inline-block;background:var(--bg4);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:10px;color:var(--text2);font-family:var(--mono);margin:2px}
+.prog-bar{height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-top:5px}
+.prog-fill{height:100%;background:var(--green);border-radius:2px;transition:width .4s ease}
+.auto-notice{background:var(--purpleDim);border:1px solid var(--purple);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--purple)}
+
+/* SPAWN TOAST */
+.spawn-toast{position:fixed;bottom:20px;right:20px;background:var(--bg2);border:1px solid var(--purple);border-radius:12px;padding:14px 18px;font-size:12px;z-index:200;animation:toastIn .4s cubic-bezier(.34,1.56,.64,1);max-width:280px;box-shadow:0 0 30px var(--purpleDim)}
+@keyframes toastIn{from{opacity:0;transform:translateY(20px) scale(.9)}to{opacity:1;transform:translateY(0) scale(1)}}
+.toast-title{font-weight:700;margin-bottom:4px;font-size:13px;color:var(--purple)}
+.toast-body{color:var(--text2);font-size:11px;line-height:1.5}
+
+.panel-empty{font-size:11px;color:var(--text3);text-align:center;padding:30px 0}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:translateY(0)}}
+@keyframes nodeSpawn{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
+@keyframes nodePulse{0%,100%{box-shadow:0 0 10px rgba(68,136,255,.2)}50%{box-shadow:0 0 28px rgba(68,136,255,.5)}}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="logo">AGENTX<em>OS</em></div>
+    <div class="pulse"></div>
+    <div class="topbar-mid">
+      <input class="goal-input" id="goalInput" placeholder='Enter goal — e.g. "Build a REST API with JWT auth and PostgreSQL"'/>
+      <button class="btn-run" id="runBtn" onclick="startRun()">▶ RUN</button>
+      <button class="btn-clear" onclick="clearAll()">✕ CLEAR</button>
+    </div>
+    <button class="btn-key" onclick="openKeyModal()" id="keyBtn">🔑 API KEY</button>
+  </header>
+
+  <!-- LEFT: AGENT REGISTRY -->
+  <aside class="left" id="leftPanel">
+    <div class="panel-title">Agent Registry</div>
+    <div class="count-box"><strong id="agentCount">0</strong><span>agents active</span></div>
+    <div class="agent-list" id="agentList"><div class="agent-empty">No agents spawned yet</div></div>
+  </aside>
+
+  <!-- CANVAS -->
+  <main class="canvas" id="canvas">
+    <div class="canvas-grid"></div>
+    <svg class="canvas-svg" id="svg"></svg>
+    <div class="nodes" id="nodes">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">⬡</div>
+        <h3>Ecosystem Ready</h3>
+        <p>Enter a goal above and hit RUN.<br/>Agents self-organize and spawn sub-agents.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- RIGHT: LOGS / CODE / DETAIL -->
+  <aside class="right">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('logs',this)">Stream</button>
+      <button class="tab" onclick="switchTab('code',this)">Code</button>
+      <button class="tab" onclick="switchTab('agent',this)">Agent</button>
+    </div>
+    <div class="tab-body">
+      <div class="tab-panel active" id="tab-logs">
+        <div class="log-stream" id="logStream">
+          <div class="log-entry l-system"><span class="log-time">--:--</span>AgentXOS ready. Enter a goal and RUN.</div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-code">
+        <div id="codePanel"><div class="panel-empty">Generated code artifacts will appear here.</div></div>
+      </div>
+      <div class="tab-panel" id="tab-agent">
+        <div class="detail" id="agentDetail"><div class="detail-empty">Click any agent node to inspect its details.</div></div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- KEY MODAL -->
+<div class="modal-bg" id="keyModal" style="display:none">
+  <div class="modal">
+    <h2>🔑 API Key Configuration</h2>
+    <p>AgentXOS uses your own API key — it stays in your browser only, never sent to any server.</p>
+    <div class="modal-field">
+      <label class="modal-label">Provider</label>
+      <select class="modal-select" id="providerSelect" onchange="updateProviderUI()">
+        <option value="anthropic">Anthropic (Claude)</option>
+        <option value="openai">OpenAI (GPT)</option>
+        <option value="groq">Groq (Llama / Mixtral)</option>
+        <option value="openrouter">OpenRouter (Any model)</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label class="modal-label" id="keyLabel">Anthropic API Key</label>
+      <input class="modal-input" id="apiKeyInput" type="password" placeholder="sk-ant-..."/>
+    </div>
+    <div class="modal-field" id="modelField">
+      <label class="modal-label">Model</label>
+      <select class="modal-select" id="modelSelect">
+        <option value="claude-sonnet-4-20250514">claude-sonnet-4-20250514 (recommended)</option>
+        <option value="claude-opus-4-5-20251101">claude-opus-4-5-20251101</option>
+        <option value="claude-haiku-4-5-20251001">claude-haiku-4-5-20251001 (fast)</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeKeyModal()">Cancel</button>
+      <button class="btn-save" onclick="saveKey()">Save & Use</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let agents = {};
+let connections = [];
+let codeBlocks = [];
+let selectedId = null;
+let isRunning = false;
+let startTime = Date.now();
+
+// API config stored in memory (not localStorage per sandbox rules)
+let apiConfig = {
+  provider: 'anthropic',
+  apiKey: '',
+  model: 'claude-sonnet-4-20250514',
+};
+
+const PROVIDERS = {
+  anthropic:   { label:'Anthropic API Key', placeholder:'sk-ant-...', base:'https://api.anthropic.com/v1/messages' },
+  openai:      { label:'OpenAI API Key',     placeholder:'sk-...',     base:'https://api.openai.com/v1/chat/completions' },
+  groq:        { label:'Groq API Key',       placeholder:'gsk_...',    base:'https://api.groq.com/openai/v1/chat/completions' },
+  openrouter:  { label:'OpenRouter API Key', placeholder:'sk-or-...',  base:'https://openrouter.ai/api/v1/chat/completions' },
+};
+
+const MODELS = {
+  anthropic:  ['claude-sonnet-4-20250514','claude-opus-4-5-20251101','claude-haiku-4-5-20251001'],
+  openai:     ['gpt-4o','gpt-4o-mini','gpt-4-turbo'],
+  groq:       ['llama-3.3-70b-versatile','llama-3.1-8b-instant','mixtral-8x7b-32768','gemma2-9b-it'],
+  openrouter: ['anthropic/claude-sonnet-4','openai/gpt-4o','meta-llama/llama-3.3-70b-instruct','google/gemini-2.0-flash-001'],
+};
+
+const TYPE_META = {
+  meta:    {icon:'🧠',color:'#aa55ff',bg:'#1a1030'},
+  planner: {icon:'📋',color:'#4488ff',bg:'#0d1828'},
+  coder:   {icon:'💻',color:'#00ff88',bg:'#0d1a10'},
+  tester:  {icon:'🧪',color:'#ffaa00',bg:'#1a1008'},
+  critic:  {icon:'🔍',color:'#ff4455',bg:'#1a0d10'},
+  api:     {icon:'🔌',color:'#00ddff',bg:'#0d1a1a'},
+  db:      {icon:'🗄️',color:'#ffaa00',bg:'#14100a'},
+  auth:    {icon:'🔐',color:'#aa55ff',bg:'#1a1030'},
+  devops:  {icon:'⚙️',color:'#00ddff',bg:'#0d1a1a'},
+  docs:    {icon:'📄',color:'#4488ff',bg:'#0d1828'},
+  generic: {icon:'⬡', color:'#4a5870',bg:'#141820'},
+};
+
+// ─── KEY MODAL ────────────────────────────────────────────────────────────────
+function openKeyModal(){document.getElementById('keyModal').style.display='flex'}
+function closeKeyModal(){document.getElementById('keyModal').style.display='none'}
+
+function updateProviderUI(){
+  const p = document.getElementById('providerSelect').value;
+  const info = PROVIDERS[p];
+  document.getElementById('keyLabel').textContent = info.label;
+  document.getElementById('apiKeyInput').placeholder = info.placeholder;
+  const ms = document.getElementById('modelSelect');
+  ms.innerHTML = MODELS[p].map(m=>`<option value="${m}">${m}</option>`).join('');
+}
+
+function saveKey(){
+  const p = document.getElementById('providerSelect').value;
+  const k = document.getElementById('apiKeyInput').value.trim();
+  const m = document.getElementById('modelSelect').value;
+  if(!k){alert('Please enter your API key');return;}
+  apiConfig = {provider:p,apiKey:k,model:m};
+  const btn = document.getElementById('keyBtn');
+  btn.textContent = `✓ ${p.toUpperCase()}`;
+  btn.style.borderColor = 'var(--green)';
+  btn.style.color = 'var(--green)';
+  closeKeyModal();
+  log(`API key set: ${p} / ${m}`, 'system');
+}
+
+// ─── CLAUDE / LLM CALL ───────────────────────────────────────────────────────
+async function callLLM(system, user, maxTokens=1500){
+  if(!apiConfig.apiKey){
+    openKeyModal();
+    throw new Error('No API key configured. Please add your key first.');
+  }
+
+  const {provider, apiKey, model} = apiConfig;
+  const base = PROVIDERS[provider].base;
+
+  try {
+    let body, headers;
+
+    if(provider === 'anthropic'){
+      headers = {'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
+      body = JSON.stringify({model,max_tokens:maxTokens,system,messages:[{role:'user',content:user}]});
+    } else {
+      // OpenAI-compatible (openai, groq, openrouter)
+      headers = {'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`};
+      if(provider==='openrouter') headers['HTTP-Referer']='https://agentxos.vercel.app';
+      body = JSON.stringify({model,max_tokens:maxTokens,messages:[{role:'system',content:system},{role:'user',content:user}]});
+    }
+
+    const res = await fetch(base, {method:'POST',headers,body});
+    if(!res.ok){
+      const err = await res.text();
+      throw new Error(`API error ${res.status}: ${err.substring(0,200)}`);
+    }
+    const data = await res.json();
+
+    if(provider==='anthropic') return data.content?.[0]?.text ?? '';
+    return data.choices?.[0]?.message?.content ?? '';
+  } catch(e){
+    throw e;
+  }
+}
+
+function parseJSON(text){
+  const c = text.replace(/```(?:json|javascript|js)?\n?/gi,'').replace(/```/g,'').trim();
+  const m = c.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+  if(!m) throw new Error('No JSON found');
+  return JSON.parse(m[1]);
+}
+
+// ─── TIME ─────────────────────────────────────────────────────────────────────
+function ts(){
+  const d=new Date();
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+}
+
+// ─── UI HELPERS ───────────────────────────────────────────────────────────────
+function log(msg, type='system'){
+  const el=document.createElement('div');
+  el.className=`log-entry l-${type}`;
+  el.innerHTML=`<span class="log-time">${ts()}</span>${msg}`;
+  const s=document.getElementById('logStream');
+  s.appendChild(el);
+  s.scrollTop=s.scrollHeight;
+}
+
+function switchTab(name,btn){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+function showToast(name,role){
+  const t=document.createElement('div');
+  t.className='spawn-toast';
+  t.innerHTML=`<div class="toast-title">⚡ Agent Spawned</div><div class="toast-body"><strong>${name}</strong><br/>${role||''}</div>`;
+  document.body.appendChild(t);
+  setTimeout(()=>{t.style.transition='opacity .4s';t.style.opacity='0';setTimeout(()=>t.remove(),400)},3000);
+}
+
+// ─── AGENT NODE ───────────────────────────────────────────────────────────────
+function spawnAgent(def, parentId=null){
+  const id='ag-'+Date.now()+'-'+Math.random().toString(36).substr(2,5);
+  const c=document.getElementById('canvas');
+  const W=c.clientWidth, H=c.clientHeight;
+  const count=Object.keys(agents).length;
+  const cols=Math.max(1,Math.floor((W-80)/200));
+  const metaAgent=Object.values(agents).find(a=>a.type==='meta');
+
+  let x,y;
+  if(def.type==='meta'){
+    x=W/2-86; y=40;
+  } else {
+    const idx=count-1;
+    const col=idx%cols;
+    const row=Math.floor(idx/cols);
+    x=40+col*(W-80)/Math.max(cols,1);
+    y=230+row*170;
+    x=Math.min(x,W-200); y=Math.min(y,H-160);
+  }
+
+  const agent={id,x,y,type:def.type||'generic',name:def.name,role:def.role,task:def.task,capabilities:def.capabilities||[],status:'idle',progress:0,activity:'Initializing...',autoSpawned:!!parentId,parentId,codeArtifacts:[],output:null};
+  agents[id]=agent;
+
+  // build DOM node
+  const m=TYPE_META[agent.type]||TYPE_META.generic;
+  const el=document.createElement('div');
+  el.className='node';
+  el.id='node-'+id;
+  el.style.cssText=`left:${x}px;top:${y}px;background:${m.bg};border-color:${m.color}33;--node-glow:${m.color}33`;
+  el.innerHTML=`
+    ${agent.autoSpawned?'<div class="auto-spawn-tag">AUTO-SPAWNED</div>':''}
+    <span class="node-icon">${m.icon}</span>
+    <div class="node-name">${agent.name}</div>
+    <div class="node-type" style="color:${m.color}">${agent.type.toUpperCase()}</div>
+    <div class="node-activity" id="act-${id}">${agent.activity}</div>
+    <div class="node-bar"><div class="node-bar-fill" id="bar-${id}" style="width:0%;background:${m.color}"></div></div>
+    <div class="node-footer">
+      <span class="status-badge s-idle" id="sbadge-${id}">idle</span>
+      <span class="artifact-count" id="acount-${id}" style="display:none">0 files</span>
+    </div>
+  `;
+  el.onclick=()=>selectAgent(id);
+
+  const empty=document.getElementById('emptyState');
+  if(empty) empty.style.display='none';
+  document.getElementById('nodes').appendChild(el);
+
+  if(parentId){
+    connections.push({from:parentId,to:id,color:m.color});
+    drawConnections();
+    showToast(agent.name,agent.role);
+    log(`⚡ Auto-spawned: <strong>${agent.name}</strong> (${agent.type})`,'spawn');
+  } else {
+    log(`✦ Spawned: <strong>${agent.name}</strong> (${agent.type})`,'agent');
+  }
+
+  updateRegistry();
+  return id;
+}
+
+function updateNode(id,{status,activity,progress}={}){
+  const a=agents[id];
+  if(!a) return;
+  if(status!==undefined){a.status=status;const b=document.getElementById('sbadge-'+id);if(b)b.className=`status-badge s-${status}`,b.textContent=status;}
+  if(activity!==undefined){a.activity=activity;const el=document.getElementById('act-'+id);if(el)el.textContent=activity;}
+  if(progress!==undefined){a.progress=progress;const b=document.getElementById('bar-'+id);if(b)b.style.width=progress+'%';}
+  if(status==='thinking'){const n=document.getElementById('node-'+id);if(n)n.classList.add('running');}
+  if(status==='idle'||status==='error'){const n=document.getElementById('node-'+id);if(n)n.classList.remove('running');}
+}
+
+function addCode(agentId,label,code,lang){
+  codeBlocks.push({agentId,label,code,lang:lang||'text'});
+  const a=agents[agentId];
+  if(a){a.codeArtifacts.push({label,lang});const c=document.getElementById('acount-'+agentId);if(c){c.style.display='';c.textContent=a.codeArtifacts.length+' file'+(a.codeArtifacts.length!==1?'s':'');}}
+  renderCode();
+  log(`Code generated: <strong>${label}</strong>`,'code');
+}
+
+function renderCode(){
+  const p=document.getElementById('codePanel');
+  if(!codeBlocks.length){p.innerHTML='<div class="panel-empty">Generated code artifacts will appear here.</div>';return;}
+  p.innerHTML=codeBlocks.map((b,i)=>`
+    <div class="code-block" style="margin-bottom:12px">
+      <div class="code-hdr">
+        <span class="code-lbl">${b.label}</span>
+        <span class="lang-tag lang-${b.lang}">${b.lang}</span>
+        <button class="copy-btn" onclick="navigator.clipboard.writeText(codeBlocks[${i}].code)">copy</button>
+      </div>
+      <pre class="code-body">${escHtml(b.code)}</pre>
+    </div>
+  `).join('');
+}
+
+function escHtml(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+function selectAgent(id){
+  selectedId=id;
+  document.querySelectorAll('.node').forEach(n=>n.classList.remove('selected'));
+  const n=document.getElementById('node-'+id);
+  if(n)n.classList.add('selected');
+  updateRegistry();
+  renderDetail(id);
+  switchTab('agent',document.querySelectorAll('.tab')[2]);
+}
+
+function renderDetail(id){
+  const a=agents[id];
+  if(!a){document.getElementById('agentDetail').innerHTML='<div class="detail-empty">Click any agent node.</div>';return;}
+  const m=TYPE_META[a.type]||TYPE_META.generic;
+  document.getElementById('agentDetail').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <div style="width:40px;height:40px;border-radius:10px;background:${m.bg};border:1px solid ${m.color}55;display:flex;align-items:center;justify-content:center;font-size:20px">${m.icon}</div>
+      <div><div style="font-size:14px;font-weight:700;color:#fff">${a.name}</div><div style="font-size:11px;font-family:var(--mono);color:${m.color}">${a.type.toUpperCase()}${a.autoSpawned?' • AUTO-SPAWNED':''}</div></div>
+    </div>
+    <div class="detail-card"><div class="detail-label">Role</div><div class="detail-val">${a.role||'—'}</div></div>
+    <div class="detail-card"><div class="detail-label">Task</div><div class="detail-val">${a.task||'—'}</div></div>
+    ${a.capabilities.length?`<div class="detail-card"><div class="detail-label">Capabilities</div><div>${a.capabilities.map(c=>`<span class="cap-tag">${c}</span>`).join('')}</div></div>`:''}
+    <div class="detail-card"><div class="detail-label">Status</div><div class="detail-val detail-mono">${a.status} (${a.progress}%)</div><div class="prog-bar"><div class="prog-fill" style="width:${a.progress}%"></div></div></div>
+    ${a.output?`<div class="detail-card"><div class="detail-label">Output</div><div class="detail-val" style="font-size:11px;max-height:100px;overflow-y:auto">${a.output.substring(0,300)}...</div></div>`:''}
+    ${a.codeArtifacts.length?`<div class="detail-card"><div class="detail-label">Code Artifacts</div>${a.codeArtifacts.map(c=>`<div class="detail-val detail-mono" style="margin-top:3px">${c.label}</div>`).join('')}</div>`:''}
+    ${a.autoSpawned?'<div class="auto-notice">⚡ Auto-spawned by another agent</div>':''}
+  `;
+}
+
+function updateRegistry(){
+  const list=document.getElementById('agentList');
+  document.getElementById('agentCount').textContent=Object.keys(agents).length;
+  const arr=Object.values(agents);
+  if(!arr.length){list.innerHTML='<div class="agent-empty">No agents spawned yet</div>';return;}
+  list.innerHTML=arr.map(a=>{
+    const m=TYPE_META[a.type]||TYPE_META.generic;
+    return`<div class="agent-card${selectedId===a.id?' selected':''}" onclick="selectAgent('${a.id}')">
+      <div class="card-header">
+        <span class="card-icon">${m.icon}</span>
+        <div><div class="card-name">${a.name}</div><div class="card-role">${a.role||a.type}</div></div>
+      </div>
+      <div class="card-footer">
+        <span class="status-badge s-${a.status||'idle'}">${a.status||'idle'}</span>
+        ${a.autoSpawned?'<span class="auto-tag">AUTO</span>':''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── CONNECTIONS ─────────────────────────────────────────────────────────────
+function drawConnections(){
+  const svg=document.getElementById('svg');
+  const canvas=document.getElementById('canvas');
+  svg.innerHTML='';
+  const cr=canvas.getBoundingClientRect();
+
+  connections.forEach(c=>{
+    const fe=document.getElementById('node-'+c.from);
+    const te=document.getElementById('node-'+c.to);
+    if(!fe||!te) return;
+    const fr=fe.getBoundingClientRect(), tr=te.getBoundingClientRect();
+    const x1=fr.left+fr.width/2-cr.left, y1=fr.top+fr.height/2-cr.top;
+    const x2=tr.left+tr.width/2-cr.left, y2=tr.top+tr.height/2-cr.top;
+    const mx=(x1+x2)/2;
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d',`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke',c.color||'#4488ff');
+    path.setAttribute('stroke-width','1.5');
+    path.setAttribute('stroke-dasharray','5 5');
+    path.setAttribute('opacity','.55');
+    svg.appendChild(path);
+  });
+}
+
+window.addEventListener('resize', drawConnections);
+
+// ─── CLEAR ───────────────────────────────────────────────────────────────────
+function clearAll(){
+  agents={}; connections=[]; codeBlocks=[]; selectedId=null; isRunning=false;
+  document.getElementById('nodes').innerHTML='<div class="empty-state" id="emptyState"><div class="empty-icon">⬡</div><h3>Ecosystem Ready</h3><p>Enter a goal above and hit RUN.<br/>Agents self-organize and spawn sub-agents.</p></div>';
+  document.getElementById('svg').innerHTML='';
+  document.getElementById('logStream').innerHTML='<div class="log-entry l-system"><span class="log-time">--:--</span>Cleared. Ready for new run.</div>';
+  document.getElementById('agentDetail').innerHTML='<div class="detail-empty">Click any agent node to inspect.</div>';
+  renderCode();
+  updateRegistry();
+  document.getElementById('runBtn').disabled=false;
+  document.getElementById('runBtn').textContent='▶ RUN';
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
+// ─── MAIN ECOSYSTEM RUN ───────────────────────────────────────────────────────
+async function startRun(){
+  if(isRunning) return;
+
+  if(!apiConfig.apiKey){
+    openKeyModal();
+    log('⚠️ Please configure your API key first.','error');
+    return;
+  }
+
+  const goal=document.getElementById('goalInput').value.trim();
+  if(!goal){document.getElementById('goalInput').focus();return;}
+
+  isRunning=true;
+  startTime=Date.now();
+  document.getElementById('runBtn').disabled=true;
+  document.getElementById('runBtn').textContent='⏳ RUNNING';
+  document.getElementById('logStream').innerHTML='';
+  clearAll();
+  // restore running state after clearAll
+  isRunning=true;
+  document.getElementById('runBtn').disabled=true;
+  document.getElementById('runBtn').textContent='⏳ RUNNING';
+
+  log(`Goal: <em>${goal}</em>`, 'system');
+  log('Initializing Meta-Agent...', 'agent');
+
+  // ── 1. Spawn Meta-Agent ──────────────────────────────────────────────────
+  const metaId = spawnAgent({name:'Meta-Agent',type:'meta',role:'Orchestrates the ecosystem',task:'Analyze goal and spawn agents',capabilities:['goal-analysis','orchestration','synthesis']});
+  updateNode(metaId,{status:'thinking',activity:'Analyzing goal...',progress:10});
+
+  // ── 2. Meta-Agent plans ──────────────────────────────────────────────────
+  log('Meta-Agent calling LLM to decompose goal...','thinking');
+
+  let plan;
+  try {
+    const raw = await callLLM(
+      `You are the Meta-Agent of AgentXOS. Analyze goals and decide which specialized agents to spawn.
+Agent types: planner, coder, tester, critic, api, db, auth, devops, docs, generic
+Rules: spawn 3-6 agents, each with distinct tasks. Respond ONLY with valid JSON.`,
+      `Goal: "${goal}"
+
+Respond with this exact JSON (no markdown, no extra text):
+{
+  "analysis": "2-3 sentence analysis",
+  "techStack": ["tech1","tech2"],
+  "agents": [
+    {
+      "name": "Agent Name",
+      "type": "type from list",
+      "role": "one sentence role",
+      "task": "specific task",
+      "capabilities": ["cap1","cap2"],
+      "priority": 1
+    }
+  ],
+  "spawnReason": "why this combination"
+}`,
+      900
+    );
+
+    try { plan = parseJSON(raw); }
+    catch(e) {
+      plan = {analysis:`Decomposing: ${goal}`,techStack:['Node.js'],agents:[
+        {name:'Planner Agent',type:'planner',role:'Plans implementation',task:`Plan for: ${goal}`,capabilities:['planning'],priority:1},
+        {name:'Coder Agent',type:'coder',role:'Writes code',task:`Code for: ${goal}`,capabilities:['coding'],priority:2},
+        {name:'Critic Agent',type:'critic',role:'Reviews output',task:`Review: ${goal}`,capabilities:['review'],priority:3},
+      ]};
+    }
+  } catch(err){
+    log(`Error: ${err.message}`,'error');
+    isRunning=false;
+    document.getElementById('runBtn').disabled=false;
+    document.getElementById('runBtn').textContent='▶ RUN';
+    return;
+  }
+
+  updateNode(metaId,{activity:plan.analysis,progress:40});
+  agents[metaId].output=plan.analysis;
+  log(`Analysis: ${plan.analysis}`,'agent');
+  log(`Tech stack: ${(plan.techStack||[]).join(', ')}`,'agent');
+  log(`Spawning ${plan.agents.length} specialized agents...`,'spawn');
+
+  // ── 3. Spawn planned agents ───────────────────────────────────────────────
+  await sleep(300);
+  const spawnedIds = [];
+  for(const def of (plan.agents||[])){
+    await sleep(250);
+    const aid = spawnAgent(def, metaId);
+    spawnedIds.push({id:aid, def});
+    drawConnections();
+  }
+  updateNode(metaId,{activity:'All agents spawned',progress:60});
+
+  // ── 4. Execute all agents in parallel ────────────────────────────────────
+  log('Executing all agents in parallel...','agent');
+  const results = await Promise.all(spawnedIds.map(({id,def})=>executeAgent(id,def,goal,metaId)));
+
+  // ── 5. Meta synthesis ─────────────────────────────────────────────────────
+  updateNode(metaId,{status:'thinking',activity:'Synthesizing results...',progress:90});
+  log('Meta-Agent synthesizing...','thinking');
+
+  try {
+    const summary = await callLLM(
+      'You are a synthesis agent. Write a clear 2-3 sentence summary of what was accomplished.',
+      `Goal: "${goal}"\nAgents completed: ${results.filter(Boolean).map(r=>`${r.name} (${r.type}): ${r.summary||'done'}`).join('; ')}`,
+      300
+    );
+    updateNode(metaId,{status:'idle',activity:'Complete',progress:100});
+    agents[metaId].output=summary;
+    log(`Synthesis: ${summary}`,'system');
+  } catch(e){
+    updateNode(metaId,{status:'idle',activity:'Complete',progress:100});
+  }
+
+  log('✓ Ecosystem run complete.','system');
+  isRunning=false;
+  document.getElementById('runBtn').disabled=false;
+  document.getElementById('runBtn').textContent='▶ RUN';
+  drawConnections();
+}
+
+// ─── EXECUTE A SINGLE AGENT ───────────────────────────────────────────────────
+async function executeAgent(agentId, def, goal, parentId){
+  const agent=agents[agentId];
+  if(!agent) return null;
+  updateNode(agentId,{status:'thinking',activity:'Thinking...',progress:10});
+
+  const typePrompts = {
+    planner: `You are a senior software architect. Create a detailed, actionable implementation plan with architecture overview, component breakdown, data flow, tech choices, and sequenced steps.`,
+    coder:   `You are a senior full-stack engineer. Write production-quality, well-commented code. Output the code directly, no markdown fences.`,
+    tester:  `You are a QA engineer. Write a comprehensive test suite with unit tests, integration tests, edge cases. Output raw test code only.`,
+    critic:  `You are a senior code reviewer. Analyze for security vulnerabilities, performance issues, scalability concerns, and missing error handling. Be specific and actionable.`,
+    api:     `You are an API architect. Design a clean REST API. Output a complete OpenAPI 3.0 YAML spec, then an Express.js router implementation. No markdown fences.`,
+    db:      `You are a database architect. Design a production PostgreSQL schema with CREATE TABLE, indexes, constraints, foreign keys. Then write Knex.js migrations. Raw SQL/JS only.`,
+    auth:    `You are a security engineer. Write a complete JWT auth system with registration, login, middleware, refresh tokens, bcrypt. Raw code only.`,
+    devops:  `You are a DevOps engineer. Generate: Dockerfile, docker-compose.yml, and GitHub Actions CI/CD workflow. Raw YAML/Dockerfile content only.`,
+    docs:    `You are a technical writer. Write a comprehensive README.md with overview, features, installation, usage, API reference. Raw markdown only.`,
+    generic: `You are a specialist AI agent. Complete your task thoroughly and professionally.`,
+  };
+
+  const sys = typePrompts[agent.type] || typePrompts.generic;
+  log(`${agent.name}: starting task`,'agent');
+
+  let output = '';
+  try {
+    output = await callLLM(sys, `Overall goal: "${goal}"\nYour specific task: ${def.task}`, 1800);
+    agent.output = output.substring(0,300);
+    updateNode(agentId,{activity:'Processing output...',progress:60});
+
+    // Generate code artifacts for technical agents
+    if(['coder','api','db','auth','devops','docs'].includes(agent.type)){
+      updateNode(agentId,{activity:'Generating artifacts...',progress:70});
+      const cleanCode = output.replace(/```[\w]*\n?/g,'').replace(/```/g,'').trim();
+
+      const langMap = {coder:'python',api:'yaml',db:'sql',auth:'javascript',devops:'yaml',docs:'markdown'};
+      const lang = langMap[agent.type] || 'text';
+      const labelMap = {coder:'implementation.py',api:'openapi.yaml',db:'schema.sql',auth:'auth.js',devops:'docker-compose.yml',docs:'README.md'};
+      const label = labelMap[agent.type] || `${agent.type}-output.txt`;
+
+      addCode(agentId, `${agent.name} → ${label}`, cleanCode, lang);
+      switchTab('code', document.querySelectorAll('.tab')[1]);
+      await sleep(1500);
+      switchTab('logs', document.querySelectorAll('.tab')[0]);
+    }
+
+    // Coder auto-spawns Tester if none exists
+    if(agent.type==='coder' && !Object.values(agents).find(a=>a.type==='tester') && Object.keys(agents).length<10){
+      await sleep(400);
+      log(`${agent.name} detected missing Tester — auto-spawning...`,'spawn');
+      const testerId = spawnAgent({
+        name:'Auto-Tester',type:'tester',
+        role:'Validates code generated by Coder Agent',
+        task:`Write tests for the ${agent.type} code generated for: ${goal}`,
+        capabilities:['unit-testing','integration-testing','coverage'],
+      }, agentId);
+      drawConnections();
+      await sleep(300);
+      await executeAgent(testerId, {task:`Write tests for: ${goal}`}, goal, agentId);
+    }
+
+    // API agent auto-spawns Auth if none exists and goal mentions auth
+    if(agent.type==='api' && goal.toLowerCase().match(/auth|login|jwt|secure/) && !Object.values(agents).find(a=>a.type==='auth') && Object.keys(agents).length<10){
+      await sleep(400);
+      log(`${agent.name} detected auth requirement — spawning Auth Agent...`,'spawn');
+      const authId = spawnAgent({
+        name:'Auth Agent',type:'auth',
+        role:'Handles authentication for the API',
+        task:`Build JWT authentication for: ${goal}`,
+        capabilities:['jwt','bcrypt','middleware'],
+      }, agentId);
+      drawConnections();
+      await sleep(300);
+      await executeAgent(authId, {task:`Build auth for: ${goal}`}, goal, agentId);
+    }
+
+  } catch(err){
+    log(`${agent.name} error: ${err.message}`,'error');
+    updateNode(agentId,{status:'error',activity:err.message.substring(0,60),progress:0});
+    return null;
+  }
+
+  updateNode(agentId,{status:'idle',activity:'Complete',progress:100});
+  log(`${agent.name} complete`,'agent');
+  if(selectedId===agentId) renderDetail(agentId);
+  return {name:agent.name,type:agent.type,summary:output.substring(0,120)};
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+document.getElementById('goalInput').addEventListener('keydown', e=>{if(e.key==='Enter') startRun();});
+</script>
+</body>
+</html>
